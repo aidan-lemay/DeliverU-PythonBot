@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+import pandas
 import storage
 from pymongo import MongoClient
 from pandas import DataFrame
@@ -15,9 +16,52 @@ CONNECTION_STRING = storage.connection
 client = MongoClient(CONNECTION_STRING)
 dbname = client.get_database()
 clock_collection = dbname['clockedIn']
+user_collection = dbname['dasherInformation']
 # time_collection = dbname['timeWorked']
 
 async def clockIn(user):
+    usrTest = DataFrame(user_collection.find({'user_id': user.id}))
+    if usrTest.empty:
+        dm = await bot.fetch_user(user.id)
+        await dm.send("Your Information Has Not Yet Been Logged!\nPlease Fill Out The Following Information To Begin Your Shift.")
+        
+        await dm.send("Type your FIRST NAME")
+        def check(msg):
+            return msg.author == user and msg.channel.type == discord.ChannelType.private
+        msg = await bot.wait_for("message", check=check)
+        firstName = msg.content.upper()
+
+        await dm.send("Type your LAST NAME")
+        def check(msg):
+            return msg.author == user and msg.channel.type == discord.ChannelType.private
+        msg = await bot.wait_for("message", check=check)
+        lastName = msg.content.upper()
+
+        await dm.send("Type your University Location Code\n2760: Rochester Institute of Technology")
+        def check(msg):
+            return msg.author == user and msg.channel.type == discord.ChannelType.private
+        msg = await bot.wait_for("message")
+        loccode = msg.content
+        code = False
+        while code == False:
+            if loccode != "2760":
+                await dm.send("Type your University Location Code\n```2760: Rochester Institute of Technology```")
+                def check(msg):
+                    return msg.author == user and msg.channel.type == discord.ChannelType.private
+                msg = await bot.wait_for("message")
+                loccode = msg.content
+            else:
+                code = True
+
+        userInfo = {
+            'user_id': user.id,
+            'user_firstname': firstName,
+            'user_lastname': lastName,
+            'user_locationcode': loccode,
+            'time_joined': datetime.datetime.now(datetime.timezone.utc)
+        }
+        user_collection.insert_one(userInfo)
+
     data = DataFrame(clock_collection.find({'user_id': user.id}))
     if data.empty:
         userDoc = {
@@ -59,12 +103,12 @@ async def clockOut(user):
         clock_collection.update_one({'user_id': user.id},{'$set':{'clockedIn': False, 'out_time': datetime.datetime.now(datetime.timezone.utc)}})
         # data = DataFrame(clock_collection.find({'user_id': user.id}))
         # timeWorked = (data['out_time'] - data['in_time'])
-        # print(timeWorked.seconds())
+        # print(pandas.to_datetime(timeWorked))
         # userTime = {
         #     'user_id': user.id,
         #     'user_name': user.name,
         #     'user_discriminator': user.discriminator,
-        #     'timeWorked': timeWorked,
+        #     'timeWorked': str(timeWorked),
         #     'timeRecorded': datetime.datetime.now(datetime.timezone.utc)
         # }
         # time_collection.insert_one(userTime)
