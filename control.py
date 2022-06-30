@@ -5,12 +5,11 @@ import storage
 from pymongo import MongoClient
 from pandas import DataFrame
 import datetime
-from bson.json_util import dumps
 
 # Bot Setup
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="/", intents=intents)
-message = None
+smessage = None
 
 guild_id = 979541976938598410
 control = 984459945900662784
@@ -134,24 +133,27 @@ async def on_ready():
     ctrl = bot.get_channel(control) # Bot Control Channel
     await ctrl.send('DeliverU Control is Online!')
     channel = bot.get_channel(clock) # Clock In/Out Server Channel
-    message = await channel.send('Good Morning from DeliverU Control! Please use the reaction below to clock in and out:\nReact :white_check_mark: to clock in, and :negative_squared_cross_mark: to clock out!')
-    await message.add_reaction(u"\u2705")
-    await message.add_reaction(u"\u274E")
+    smessage = await channel.send('Good Morning from DeliverU Control! Please use the reaction below to clock in and out:\nReact :white_check_mark: to clock in, and :negative_squared_cross_mark: to clock out!')
+    await smessage.add_reaction(u"\u2705")
+    await smessage.add_reaction(u"\u274E")
 
 @bot.event
 async def on_reaction_add(reaction, user, member):
     if not user.bot:
-        if reaction.emoji == '✅':
-            await clockIn(user)
-            await reaction.remove(user)
-            Role = discord.utils.get(user.guild.roles, name="ClockedIn")
-            await member.add_roles(reaction.message.author, Role)
-        elif reaction.emoji == '❎':
-            await clockOut(user)
-            await reaction.remove(user)
-            Role = discord.utils.get(user.guild.roles, name="ClockedIn")
-            await member.remove_roles(reaction.message.author, Role)
-            
+        if reaction.message.id == smessage.id:
+            if reaction.emoji == '✅':
+                await clockIn(user)
+                await reaction.remove(user)
+                Role = discord.utils.get(user.guild.roles, name="ClockedIn")
+                await member.add_roles(reaction.message.author, Role)
+            elif reaction.emoji == '❎':
+                await clockOut(user)
+                await reaction.remove(user)
+                Role = discord.utils.get(user.guild.roles, name="ClockedIn")
+                await member.remove_roles(reaction.message.author, Role)
+        else:
+            # Dispatch users from here, write updates to / from DB
+            mid = reaction.message.content.split()[0]
 
 
 @bot.event
