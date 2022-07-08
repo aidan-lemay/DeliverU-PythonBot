@@ -12,17 +12,17 @@ intents = discord.Intents.default()
 intents.reactions = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-guild_id = 979541976938598410
-control = 984459945900662784
-general = 981001960566185984
-clock = 993325622262759444
-dispatch = 984464477019844639
-orders = 993327814482874479
-control_id = 976117168318066708
-dispatch_id = 983565042123427870
+guild_id = 979541976938598410 # ID of server
+control = 984459945900662784 # ID of this bot in server
+general = 981001960566185984 # ID of #General text channel
+clock = 993325622262759444 # ID of channel where clock-in/out messages are sent
+dispatch = 984464477019844639 # ID of Dispatch bot in this server
+orders = 993327814482874479 # ID of PRIVATE channel where bot order logs are dumped
+control_id = 976117168318066708 # ID of PRIVATE channel where bot control and logging is dumped
+dispatch_id = 983565042123427870 # ID of channel where orders are dispatched from
 
-role = 984463229466075136
-dash_role = 994984065465847878
+clocked_role = 984463229466075136 # ID of ClockedIN role
+dash_role = 994984065465847878 # ID of Dashers role
 
 # MongoDB Setup
 CONNECTION_STRING = storage.connection
@@ -122,14 +122,13 @@ async def clockIn(user):
         await dm.send("You Have Been Clocked In!")
 
 async def clockOut(user):
-    # ToDo: When clocking out, record hours worked into seperate data table | clocked_out - clocked_in = timeWorked
     data = DataFrame(clock_collection.find({'user_id': user.id}))
     
     if data['clockedIn'].bool() == True:
         clock_collection.update_one({'user_id': user.id},{'$set':{'clockedIn': False, 'out_time': str(datetime.datetime.now(datetime.timezone.utc))}})
         dm = await bot.fetch_user(user.id)
         await dm.send("You Have Been Clocked Out!")
-        ctrl = bot.get_channel(control) # Bot Control Channel
+        ctrl = bot.get_channel(control)
         await ctrl.send(str(user.name) + " Has Been Clocked Out At " + str(datetime.datetime.now(datetime.timezone.utc)))
     else:
         dm = await bot.fetch_user(user.id)
@@ -138,9 +137,9 @@ async def clockOut(user):
 @bot.event
 async def on_ready():
     print('Logged in as {0.user}'.format(bot))
-    ctrl = bot.get_channel(control) # Bot Control Channel
+    ctrl = bot.get_channel(control)
     await ctrl.send('DeliverU Control is Online!')
-    channel = bot.get_channel(clock) # Clock In/Out Server Channel
+    channel = bot.get_channel(clock)
     smessage = await channel.send('<@&' + str(dash_role) + '> Good Morning from DeliverU Control! Please use the reaction below to clock in and out:\nReact :white_check_mark: to clock in, and :negative_squared_cross_mark: to clock out!')
     await smessage.add_reaction(u"\u2705")
     await smessage.add_reaction(u"\u274E")
@@ -193,7 +192,7 @@ async def on_message(message):
         msg = message.content.split( )
         order = DataFrame(order_collection.find({'_id': ObjectId(msg[0])}))
         channel = bot.get_channel(dispatch)
-        smessage = await channel.send(str(msg[0]) + "\n<@&" + str(role) + "> A New Order Has Been Submitted!\nFROM: " + order.loc[0]['diningAddress'] + "\nTO: " + order.loc[0]['deliveryAddress'] + "\nReact with :white_check_mark: to claim!")
+        smessage = await channel.send(str(msg[0]) + "\n<@&" + str(clocked_role) + "> A New Order Has Been Submitted!\nFROM: " + order.loc[0]['diningAddress'] + "\nTO: " + order.loc[0]['deliveryAddress'] + "\nReact with :white_check_mark: to claim!")
         await smessage.add_reaction(u"\u2705")
 
 bot.run(storage.ctoken)
