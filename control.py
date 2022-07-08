@@ -1,19 +1,24 @@
 import discord
 from discord.ext import commands
-import pandas
+from numpy import disp
 import storage
 from pymongo import MongoClient
 from pandas import DataFrame
 import datetime
+from bson.objectid import ObjectId
 
 # Bot Setup
 intents = discord.Intents.default()
+intents.reactions = True
 bot = commands.Bot(command_prefix="/", intents=intents)
-smessage = None
 
 guild_id = 979541976938598410
 control = 984459945900662784
-clock = 981001960566185984
+general = 981001960566185984
+clock = 993325622262759444
+dispatch = 984464477019844639
+orders = 993327814482874479
+
 role = 984463229466075136
 
 # MongoDB Setup
@@ -22,10 +27,8 @@ client = MongoClient(CONNECTION_STRING)
 dbname = client.get_database()
 clock_collection = dbname['clockedIn']
 user_collection = dbname['dasherInformation']
+order_collection = dbname['orders']
 # time_collection = dbname['timeWorked']
-
-# MongoDB ChangeStream Setup
-change_stream = dbname.changestream.orders.watch()
 
 async def clockIn(user):
     usrTest = DataFrame(user_collection.find({'user_id': user.id}))
@@ -133,27 +136,35 @@ async def on_ready():
     ctrl = bot.get_channel(control) # Bot Control Channel
     await ctrl.send('DeliverU Control is Online!')
     channel = bot.get_channel(clock) # Clock In/Out Server Channel
-    smessage = await channel.send('Good Morning from DeliverU Control! Please use the reaction below to clock in and out:\nReact :white_check_mark: to clock in, and :negative_squared_cross_mark: to clock out!')
-    await smessage.add_reaction(u"\u2705")
-    await smessage.add_reaction(u"\u274E")
+    # smessage = await channel.send('Good Morning from DeliverU Control! Please use the reaction below to clock in and out:\nReact :white_check_mark: to clock in, and :negative_squared_cross_mark: to clock out!')
+    # await smessage.add_reaction(u"\u2705")
+    # await smessage.add_reaction(u"\u274E")
 
 @bot.event
-async def on_reaction_add(reaction, user, member):
+async def on_reaction_add(reaction, user):
     if not user.bot:
-        if reaction.message.id == smessage.id:
+        print(user.bot)
+        print(reaction.message.content)
+        if reaction.message.channel == clock:
             if reaction.emoji == '✅':
                 await clockIn(user)
                 await reaction.remove(user)
                 Role = discord.utils.get(user.guild.roles, name="ClockedIn")
-                await member.add_roles(reaction.message.author, Role)
+                # await member.add_roles(reaction.message.author, Role)
             elif reaction.emoji == '❎':
                 await clockOut(user)
                 await reaction.remove(user)
                 Role = discord.utils.get(user.guild.roles, name="ClockedIn")
-                await member.remove_roles(reaction.message.author, Role)
-        else:
-            # Dispatch users from here, write updates to / from DB
+                # await member.remove_roles(reaction.message.author, Role)
+        elif reaction.message.channel == dispatch:
             mid = reaction.message.content.split()[0]
+            print(mid)
+            usr = DataFrame(clock_collection.find({'user_id': user.id}))
+            dm = await bot.fetch_user(user.id)
+            if usr['clockedIn'].bool() == True:
+                await dm.send("Order has been accepted")
+            else:
+                await dm.send("You are not clocked in - please clock in before accepting orders.")
 
 
 @bot.event
@@ -179,4 +190,11 @@ async def on_message(message):
         #         await usr.remove_roles(role)
         #     except discord.Forbidden:
         #         await bot.send_message(message.channel, "I don't have perms to add roles.")
+
+    elif (message.channel.id == orders):
+        msg = message.content.split( )
+        order = DataFrame(order_collection.find({'_id': ObjectId(msg[0])}))
+        channel = bot.get_channel(dispatch)
+        await channel.send(str(msg[0]) + "\n<@&" + str(role) + "> A New Order Has Been Submitted!\nFROM: " + order.loc[0]['diningAddress'] + "\nTO: " + order.loc[0]['deliveryAddress'] + "\nReact with :white_check_mark: to claim!")
+
 bot.run(storage.ctoken)
