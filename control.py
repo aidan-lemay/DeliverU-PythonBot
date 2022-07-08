@@ -89,7 +89,7 @@ async def clockIn(user):
         clock_collection.insert_one(userDoc)
         
         ctrl = bot.get_channel(control) # Bot Control Channel
-        await ctrl.send(str(user.id) + " Has Been Clocked In")
+        await ctrl.send(str(user.name) + " Has Been Clocked In At " + str(datetime.datetime.now(datetime.timezone.utc)))
         
         dm = await bot.fetch_user(user.id)
         await dm.send("You Have Been Clocked In!")
@@ -100,7 +100,7 @@ async def clockIn(user):
         clock_collection.update_one({'user_id': user.id},{'$set':{'clockedIn': True, 'in_time': datetime.datetime.now(datetime.timezone.utc), 'out_time': ''}})
         
         ctrl = bot.get_channel(control) # Bot Control Channel
-        await ctrl.send(str(user.id) + " Has Been Clocked In")
+        await ctrl.send(str(user.name) + " Has Been Clocked In At " + str(datetime.datetime.now(datetime.timezone.utc)))
 
         dm = await bot.fetch_user(user.id)
         await dm.send("You Have Been Clocked In!")
@@ -116,7 +116,7 @@ async def clockIn(user):
         clock_collection.insert_one(userDoc)
 
         ctrl = bot.get_channel(control) # Bot Control Channel
-        await ctrl.send(str(user.name) + " Has Been Clocked In At" + datetime.datetime.now(datetime.timezone.utc))
+        await ctrl.send(str(user.name) + " Has Been Clocked In At " + str(datetime.datetime.now(datetime.timezone.utc)))
 
         dm = await bot.fetch_user(user.id)
         await dm.send("You Have Been Clocked In!")
@@ -126,11 +126,11 @@ async def clockOut(user):
     data = DataFrame(clock_collection.find({'user_id': user.id}))
     
     if data['clockedIn'].bool() == True:
-        clock_collection.update_one({'user_id': user.id},{'$set':{'clockedIn': False, 'out_time': datetime.datetime.now(datetime.timezone.utc)}})
+        clock_collection.update_one({'user_id': user.id},{'$set':{'clockedIn': False, 'out_time': str(datetime.datetime.now(datetime.timezone.utc))}})
         dm = await bot.fetch_user(user.id)
         await dm.send("You Have Been Clocked Out!")
         ctrl = bot.get_channel(control) # Bot Control Channel
-        await ctrl.send(str(user.name) + " Has Been Clocked Out At" + datetime.datetime.now(datetime.timezone.utc))
+        await ctrl.send(str(user.name) + " Has Been Clocked Out At " + str(datetime.datetime.now(datetime.timezone.utc)))
     else:
         dm = await bot.fetch_user(user.id)
         await dm.send("You Have Not Clocked In Today")
@@ -165,16 +165,26 @@ async def on_reaction_add(reaction, user):
                 await member.remove_roles(Role)
 
         elif reaction.message.channel.id == dispatch:
+
             mid = reaction.message.content.split()[0]
             usr = DataFrame(clock_collection.find({'user_id': user.id}))
+            order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
             dm = await bot.fetch_user(user.id)
-            if usr['clockedIn'].bool() == True:
-                ctime = datetime.datetime
-                # clock_collection.update_one({'user_id': user.id},{'$set':{'clockedIn': True, 'in_time': datetime.datetime.now(datetime.timezone.utc), 'out_time': ''}})
-                order_collection.update_one({'_id': mid[0]}, {'$set':{'dasherAssigned': True, 'acceptTime': datetime.datetime.now(datetime.timezone.utc), 'dasherID': user.id}})
-                await dm.send("Order has been accepted")
+
+            if order['dasherAssigned'].bool() == False:
+                if usr['clockedIn'].bool() == True:
+                    order_collection.update_one({'_id': mid[0]}, {'$set':{'dasherAssigned': True, 'acceptTime': datetime.datetime.now(datetime.timezone.utc), 'dasherID': user.id}})
+                    order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
+                    
+                    await dm.send("Order has been accepted!\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'])
+                    
+                    channel = bot.get_channel(control)
+                    await channel.send("Order has been accepted by " + user.name + " at " + str(datetime.datetime.now(datetime.timezone.utc)) + "\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'])
+                    await reaction.message.delete()
+                else:
+                    await dm.send("You are not clocked in - please clock in before accepting orders.")
             else:
-                await dm.send("You are not clocked in - please clock in before accepting orders.")
+                await dm.send("Order has Already Been Accepted!")
 
 
 @bot.event
