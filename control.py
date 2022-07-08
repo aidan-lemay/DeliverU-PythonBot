@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from numpy import disp
+import numpy
 import storage
 from pymongo import MongoClient
 from pandas import DataFrame
@@ -18,6 +18,8 @@ general = 981001960566185984
 clock = 993325622262759444
 dispatch = 984464477019844639
 orders = 993327814482874479
+control_id = 976117168318066708
+dispatch_id = 983565042123427870
 
 role = 984463229466075136
 
@@ -136,29 +138,31 @@ async def on_ready():
     ctrl = bot.get_channel(control) # Bot Control Channel
     await ctrl.send('DeliverU Control is Online!')
     channel = bot.get_channel(clock) # Clock In/Out Server Channel
-    # smessage = await channel.send('Good Morning from DeliverU Control! Please use the reaction below to clock in and out:\nReact :white_check_mark: to clock in, and :negative_squared_cross_mark: to clock out!')
-    # await smessage.add_reaction(u"\u2705")
-    # await smessage.add_reaction(u"\u274E")
+    smessage = await channel.send('Good Morning from DeliverU Control! Please use the reaction below to clock in and out:\nReact :white_check_mark: to clock in, and :negative_squared_cross_mark: to clock out!')
+    await smessage.add_reaction(u"\u2705")
+    await smessage.add_reaction(u"\u274E")
 
 @bot.event
 async def on_reaction_add(reaction, user):
-    if not user.bot:
-        print(user.bot)
-        print(reaction.message.content)
-        if reaction.message.channel == clock:
+    if not user.id == control_id:
+        if reaction.message.channel.id == clock:
+
+            guild = bot.get_guild(guild_id)
+            member = await guild.fetch_member(user.id)
+            Role = discord.utils.get(member.guild.roles, name="ClockedIn")
+
             if reaction.emoji == '✅':
                 await clockIn(user)
                 await reaction.remove(user)
-                Role = discord.utils.get(user.guild.roles, name="ClockedIn")
-                # await member.add_roles(reaction.message.author, Role)
+                
+                await member.add_roles(Role)
             elif reaction.emoji == '❎':
                 await clockOut(user)
                 await reaction.remove(user)
-                Role = discord.utils.get(user.guild.roles, name="ClockedIn")
-                # await member.remove_roles(reaction.message.author, Role)
-        elif reaction.message.channel == dispatch:
+                await member.remove_roles(Role)
+
+        elif reaction.message.channel.id == dispatch:
             mid = reaction.message.content.split()[0]
-            print(mid)
             usr = DataFrame(clock_collection.find({'user_id': user.id}))
             dm = await bot.fetch_user(user.id)
             if usr['clockedIn'].bool() == True:
@@ -169,29 +173,7 @@ async def on_reaction_add(reaction, user):
 
 @bot.event
 async def on_message(message):
-    if (message.channel.id == control) and (message.content.find("Clocked") != -1):
-        msg = message.content
-        msg = msg.split( )
-
-        # usr = await bot.fetch_user(msg[0])
-        mbr = bot.get_all_members()
-        for member in mbr:
-            print(member)
-
-        # Need to: Get guild, then get MEMBER from guild using ID and bot.get_member(id)
-
-        # if message.content.find(" Has Been Clocked In") != -1:
-        #     try:
-        #         await usr.add_roles(role)
-        #     except discord.Forbidden:
-        #         await bot.send_message(message.channel, "I don't have perms to add roles.")
-        # elif message.content.find(" Has Been Clocked Out") != -1:
-        #     try:
-        #         await usr.remove_roles(role)
-        #     except discord.Forbidden:
-        #         await bot.send_message(message.channel, "I don't have perms to add roles.")
-
-    elif (message.channel.id == orders):
+    if (message.channel.id == orders):
         msg = message.content.split( )
         order = DataFrame(order_collection.find({'_id': ObjectId(msg[0])}))
         channel = bot.get_channel(dispatch)
