@@ -10,6 +10,7 @@ from bson.objectid import ObjectId
 # Bot Setup
 intents = discord.Intents.default()
 intents.reactions = True
+intents.members = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 guild_id = 979541976938598410 # ID of server
@@ -147,44 +148,52 @@ async def on_ready():
 @bot.event
 async def on_reaction_add(reaction, user):
     if not user.id == control_id:
-        if reaction.message.channel.id == clock:
+        if not isinstance(reaction.message.channel, discord.DMChannel):
+            if reaction.message.channel.id == clock:
 
-            guild = bot.get_guild(guild_id)
-            member = await guild.fetch_member(user.id)
-            Role = discord.utils.get(member.guild.roles, name="ClockedIn")
+                guild = bot.get_guild(guild_id)
+                member = await guild.fetch_member(user.id)
+                Role = discord.utils.get(member.guild.roles, name="ClockedIn")
 
-            if reaction.emoji == '✅':
-                await clockIn(user)
-                await reaction.remove(user)
-                
-                await member.add_roles(Role)
-            elif reaction.emoji == '❎':
-                await clockOut(user)
-                await reaction.remove(user)
-                await member.remove_roles(Role)
-
-        elif reaction.message.channel.id == dispatch:
-
-            mid = reaction.message.content.split()[0]
-            usr = DataFrame(clock_collection.find({'user_id': user.id}))
-            order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
-            dm = await bot.fetch_user(user.id)
-
-            if order['dasherAssigned'].bool() == False:
-                if usr['clockedIn'].bool() == True:
-                    order_collection.update_one({'_id': mid[0]}, {'$set':{'dasherAssigned': True, 'acceptTime': datetime.datetime.now(datetime.timezone.utc), 'dasherID': user.id}})
-                    order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
+                if reaction.emoji == '✅':
+                    await clockIn(user)
+                    await reaction.remove(user)
                     
-                    await dm.send("Order has been accepted!\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'])
-                    
-                    channel = bot.get_channel(control)
-                    await channel.send("Order has been accepted by " + user.name + " at " + str(datetime.datetime.now(datetime.timezone.utc)) + "\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'])
-                    await reaction.message.delete()
+                    await member.add_roles(Role)
+                elif reaction.emoji == '❎':
+                    await clockOut(user)
+                    await reaction.remove(user)
+                    await member.remove_roles(Role)
+
+            elif reaction.message.channel.id == dispatch:
+
+                mid = reaction.message.content.split()[0]
+                usr = DataFrame(clock_collection.find({'user_id': user.id}))
+                order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
+                dm = await bot.fetch_user(user.id)
+
+                if order['dasherAssigned'].bool() == False:
+                    if usr['clockedIn'].bool() == True:
+                        await order_collection.update_one({'_id': mid[0]}, {'$set':{'dasherAssigned': True, 'acceptTime': datetime.datetime.now(datetime.timezone.utc), 'dasherID': user.id}})
+                        order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
+                        
+                        smessage = await dm.send(mid[0] + " Order has been accepted!\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'] + "\nReact with :white_check_mark: to mark as complete!")
+                        await smessage.add_reaction(u"\u274E")
+
+                        channel = bot.get_channel(control)
+                        await channel.send("Order has been accepted by " + user.name + " at " + str(datetime.datetime.now(datetime.timezone.utc)) + "\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'])
+                        await reaction.message.delete()
+                    else:
+                        await dm.send("You are not clocked in - please clock in before accepting orders.")
                 else:
-                    await dm.send("You are not clocked in - please clock in before accepting orders.")
-            else:
-                await dm.send("Order has Already Been Accepted!")
+                    await dm.send("Order has Already Been Accepted!")
 
+        else:
+            if reaction.emoji == '✅':
+                mid = reaction.message.content.split()[0]
+                await order_collection.update_one({'_id': mid[0]}, {'$set':{'orderComplete': True, 'completeTime': datetime.datetime.now(datetime.timezone.utc)}})
+
+                
 
 @bot.event
 async def on_message(message):
