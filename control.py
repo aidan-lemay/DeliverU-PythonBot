@@ -1,6 +1,5 @@
 import discord
 from discord.ext import commands
-import numpy
 import storage
 from pymongo import MongoClient
 from pandas import DataFrame
@@ -141,7 +140,7 @@ async def on_ready():
     ctrl = bot.get_channel(control)
     await ctrl.send('DeliverU Control is Online!')
     channel = bot.get_channel(clock)
-    smessage = await channel.send('<@&' + str(dash_role) + '> Good Morning from DeliverU Control! Please use the reaction below to clock in and out:\nReact :white_check_mark: to clock in, and :negative_squared_cross_mark: to clock out!')
+    smessage = await channel.send('<@&'  + str(dash_role) + '> Good Morning from DeliverU Control! Please use the reaction below to clock in and out:\nReact :white_check_mark: to clock in, and :negative_squared_cross_mark: to clock out!')
     await smessage.add_reaction(u"\u2705")
     await smessage.add_reaction(u"\u274E")
 
@@ -174,11 +173,11 @@ async def on_reaction_add(reaction, user):
 
                 if order['dasherAssigned'].bool() == False:
                     if usr['clockedIn'].bool() == True:
-                        await order_collection.update_one({'_id': mid[0]}, {'$set':{'dasherAssigned': True, 'acceptTime': datetime.datetime.now(datetime.timezone.utc), 'dasherID': user.id}})
+                        order_collection.update_one({'_id': ObjectId(mid)}, {'$set':{'dasherAssigned': True, 'acceptTime': datetime.datetime.now(datetime.timezone.utc), 'dasherID': user.id}})
                         order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
                         
-                        smessage = await dm.send(mid[0] + " Order has been accepted!\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'] + "\nReact with :white_check_mark: to mark as complete!")
-                        await smessage.add_reaction(u"\u274E")
+                        smessage = await dm.send(mid + " Order has been accepted!\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'] + "\nReact with :white_check_mark: to mark as complete!")
+                        await smessage.add_reaction(u"\u2705")
 
                         channel = bot.get_channel(control)
                         await channel.send("Order has been accepted by " + user.name + " at " + str(datetime.datetime.now(datetime.timezone.utc)) + "\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'])
@@ -191,7 +190,7 @@ async def on_reaction_add(reaction, user):
         else:
             if reaction.emoji == '✅':
                 mid = reaction.message.content.split()[0]
-                await order_collection.update_one({'_id': mid[0]}, {'$set':{'orderComplete': True, 'completeTime': datetime.datetime.now(datetime.timezone.utc)}})
+                order_collection.update_one({'_id': ObjectId(mid)}, {'$set':{'orderComplete': True, 'completeTime': datetime.datetime.now(datetime.timezone.utc)}})
 
                 
 
