@@ -146,7 +146,7 @@ async def on_ready():
 
 @bot.event
 async def on_reaction_add(reaction, user):
-    if not user.id == control_id:
+    if user.id != control_id:
         if not isinstance(reaction.message.channel, discord.DMChannel):
             if reaction.message.channel.id == clock:
 
@@ -191,6 +191,9 @@ async def on_reaction_add(reaction, user):
             if reaction.emoji == '✅':
                 mid = reaction.message.content.split()[0]
                 order_collection.update_one({'_id': ObjectId(mid)}, {'$set':{'orderComplete': True, 'completeTime': datetime.datetime.now(datetime.timezone.utc)}})
+                channel = bot.get_channel(control)
+                await channel.send("Order " + mid + " has been completed by " + user.name + " at " + str(datetime.datetime.now(datetime.timezone.utc)))
+                await reaction.message.edit(content="Your Order Has Been Completed! Nice Job!")
 
                 
 
