@@ -1,0 +1,13 @@
+#####: {
+        "guild_id": , # ID of server
+        "control": , # ID of this bot in server
+        "general": , # ID of #General text channel
+        "clock": , # ID of channel where clock-in/out messages are sent
+        "dispatch": , # ID of Dispatch bot in this server
+        "orders": , # ID of PRIVATE channel where bot order logs are dumped
+        "control_id": , # ID of PRIVATE channel where bot control and logging is dumped
+        "dispatch_id": , # ID of channel where orders are dispatched from
+
+        "clocked_role": , # ID of ClockedIN role
+        "dash_role":  # ID of Dashers role
+    }
