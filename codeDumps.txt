@@ -11,3 +11,38 @@
         "clocked_role": , # ID of ClockedIN role
         "dash_role":  # ID of Dashers role
     }
+
+
+    else: # Needs to accomodate for differences in locationcode
+                channel = reaction.message.channel.id
+                found = False
+                location = {}
+
+                for l in locations:
+                    if found == False and channel == locations[l]['dispatch-channel']:
+                        location = locations[l]
+                        found = True
+
+                if found:
+
+                    mid = reaction.message.content.split()[0]
+                    usr = DataFrame(clock_collection.find({'user_id': user.id}))
+                    order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
+                    dm = await bot.fetch_user(user.id)
+                    
+                    if user.bot == False:
+                        if order['dasherAssigned'].bool() == False:
+                            if usr['clockedIn'].bool() == True:
+                                order_collection.update_one({'_id': ObjectId(mid)}, {'$set':{'dasherAssigned': True, 'acceptTime': datetime.datetime.now(datetime.timezone.utc), 'dasherID': user.id}})
+                                order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
+                                
+                                smessage = await dm.send(mid + " Order has been accepted!\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'] + "\nReact with :white_check_mark: to mark as complete!")
+                                await smessage.add_reaction(u"\u2705")
+
+                                channel = bot.get_channel(location['control-channel'])
+                                await channel.send("Order has been accepted by " + user.name + " at " + str(datetime.datetime.now(datetime.timezone.utc)) + "\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'])
+                                await reaction.message.delete()
+                            else:
+                                await dm.send("You are not clocked in - please clock in before accepting orders.")
+                        else:
+                            await dm.send("Order has Already Been Accepted!")
