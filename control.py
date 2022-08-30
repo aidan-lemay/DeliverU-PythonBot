@@ -13,7 +13,7 @@ intents.members = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
 # locations = storage.locations
-locations = storage.locations
+locations = storage.testing
 controlBotID = storage.controlBotID
 dispatchBotID = storage.dispatchBotID
 
@@ -237,7 +237,9 @@ async def on_message(message):
         msg = message.content.split( )
         order = DataFrame(order_collection.find({'_id': ObjectId(msg[0])}))
         channel = bot.get_channel(dispatch)
-        smessage = await channel.send(str(msg[0]) + "\n<@&" + str(clocked_role) + "> A New Order Has Been Submitted!\nFROM: " + order.loc[0]['diningAddress'] + "\nTO: " + order.loc[0]['deliveryAddress'] + "\nReact with :white_check_mark: to claim!")
+        dinAddr = order.loc[0]['diningAddress']
+        delAddr = order.loc[0]['deliveryAddress']
+        smessage = await channel.send(str(msg[0]) + "\n<@&" + str(clocked_role) + "> A New Order Has Been Submitted!\nFROM: " + dinAddr + "\nTO: " + delAddr + "\nReact with :white_check_mark: to claim!")
         await smessage.add_reaction(u"\u2705")
 
 bot.run(storage.ctoken)
