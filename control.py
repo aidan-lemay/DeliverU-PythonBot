@@ -14,6 +14,7 @@ bot = commands.Bot(command_prefix="/", intents=intents)
 
 locations = storage.locations
 # locations = storage.testing
+
 controlBotID = storage.controlBotID
 dispatchBotID = storage.dispatchBotID
 
@@ -44,14 +45,14 @@ async def clockIn(user):
         msg = await bot.wait_for("message", check=check)
         lastName = msg.content.upper()
 
-        await dm.send("Type your University Location Code\n2760: Rochester Institute of Technology\n5816: University of North Carolina")
+        await dm.send("Type your University Location Code\n```2760: Rochester Institute of Technology\n5816: University of North Carolina```")
         def check(msg):
             return msg.author == user and msg.channel.type == discord.ChannelType.private
         msg = await bot.wait_for("message")
         loccode = msg.content
         code = False
         while code == False:
-            if loccode != "2760" or loccode != "5816":
+            if loccode != "2760" and loccode != "5816":
                 await dm.send("Type your University Location Code\n```2760: Rochester Institute of Technology\n5816: University of North Carolina```")
                 def check(msg):
                     return msg.author == user and msg.channel.type == discord.ChannelType.private
@@ -68,6 +69,8 @@ async def clockIn(user):
             'time_joined': datetime.datetime.now(datetime.timezone.utc)
         }
         user_collection.insert_one(userInfo)
+    
+    userInfo = DataFrame(user_collection.find({'user_id': user.id}))
 
     data = DataFrame(clock_collection.find({'user_id': user.id}))
     if data.empty:
@@ -81,7 +84,7 @@ async def clockIn(user):
         }
         clock_collection.insert_one(userDoc)
         
-        ctrl = bot.get_channel(locations[loccode]['control']) # Bot Control Channel
+        ctrl = bot.get_channel(locations[int(userInfo['user_locationcode'][0])]['control-channel']) # Bot Control Channel
         await ctrl.send(str(user.name) + " Has Been Clocked In At " + str(datetime.datetime.now(datetime.timezone.utc)))
         
         dm = await bot.fetch_user(user.id)
@@ -92,7 +95,7 @@ async def clockIn(user):
     elif data['clockedIn'].bool() == False:
         clock_collection.update_one({'user_id': user.id},{'$set':{'clockedIn': True, 'in_time': datetime.datetime.now(datetime.timezone.utc), 'out_time': ''}})
         
-        ctrl = bot.get_channel(locations[int(loccode)]['control']) # Bot Control Channel
+        ctrl = bot.get_channel(locations[int(userInfo['user_locationcode'][0])]['control-channel']) # Bot Control Channel
         await ctrl.send(str(user.name) + " Has Been Clocked In At " + str(datetime.datetime.now(datetime.timezone.utc)))
 
         dm = await bot.fetch_user(user.id)
@@ -108,7 +111,7 @@ async def clockIn(user):
         }
         clock_collection.insert_one(userDoc)
 
-        ctrl = bot.get_channel(locations[loccode]['control']) # Bot Control Channel
+        ctrl = bot.get_channel(locations[user.loccode]['control']) # Bot Control Channel
         await ctrl.send(str(user.name) + " Has Been Clocked In At " + str(datetime.datetime.now(datetime.timezone.utc)))
 
         dm = await bot.fetch_user(user.id)
@@ -117,18 +120,24 @@ async def clockIn(user):
 async def clockOut(user):
     data = DataFrame(clock_collection.find({'user_id': user.id}))
     usr = DataFrame(user_collection.find({'user_id': user.id}))
-    loccode = usr['user_locationcode'][0]
-    control = locations[int(loccode)]['control-channel']
-    
-    if data['clockedIn'].bool() == True:
-        clock_collection.update_one({'user_id': user.id},{'$set':{'clockedIn': False, 'out_time': str(datetime.datetime.now(datetime.timezone.utc))}})
+
+    if usr.empty:
         dm = await bot.fetch_user(user.id)
-        await dm.send("You Have Been Clocked Out!")
-        ctrl = bot.get_channel(control)
-        await ctrl.send(str(user.name) + " Has Been Clocked Out At " + str(datetime.datetime.now(datetime.timezone.utc)))
+        await dm.send("You don't exist in our database! Please clock-in and sign-up before continuing!")
+
     else:
-        dm = await bot.fetch_user(user.id)
-        await dm.send("You Have Not Clocked In Today")
+        loccode = usr['user_locationcode'][0]
+        control = locations[int(loccode)]['control-channel']
+        
+        if data['clockedIn'].bool() == True:
+            clock_collection.update_one({'user_id': user.id},{'$set':{'clockedIn': False, 'out_time': str(datetime.datetime.now(datetime.timezone.utc))}})
+            dm = await bot.fetch_user(user.id)
+            await dm.send("You Have Been Clocked Out!")
+            ctrl = bot.get_channel(control)
+            await ctrl.send(str(user.name) + " Has Been Clocked Out At " + str(datetime.datetime.now(datetime.timezone.utc)))
+        else:
+            dm = await bot.fetch_user(user.id)
+            await dm.send("You Have Not Clocked In Today")
 
 
 @bot.event
@@ -152,24 +161,31 @@ async def on_reaction_add(reaction, user):
     if not isinstance(reaction.message.channel, discord.DMChannel):
             for l in locations:
                 if user.id != locations[l]['control-bot']:
-                    if reaction.message.channel.id == locations[l]['clock-channel']:
-
-                        usr = DataFrame(user_collection.find({'user_id': user.id}))
-                        loc = int(usr['user_locationcode'][0])
-
-                        guild = bot.get_guild(locations[loc]['guild_id'])
-                        member = await guild.fetch_member(user.id)
-                        Role = discord.utils.get(member.guild.roles, name="ClockedIn")
+                    if reaction.message.channel.id == locations[l]['clock-channel']:                      
 
                         if reaction.emoji == '✅':
                             await clockIn(user)
-                            await reaction.remove(user)
-                            
-                            await member.add_roles(Role)
+                            usr = DataFrame(user_collection.find({'user_id': user.id}))  
+                            if not usr.empty:
+                                loc = int(usr['user_locationcode'][0])
+
+                                guild = bot.get_guild(locations[loc]['guild_id'])
+                                member = await guild.fetch_member(user.id)
+                                Role = discord.utils.get(member.guild.roles, name="ClockedIn")
+                                await reaction.remove(user)
+                                await member.add_roles(Role)
+
                         elif reaction.emoji == '❎':
                             await clockOut(user)
-                            await reaction.remove(user)
-                            await member.remove_roles(Role)
+                            usr = DataFrame(user_collection.find({'user_id': user.id}))  
+                            if not usr.empty:
+                                loc = int(usr['user_locationcode'][0])
+
+                                guild = bot.get_guild(locations[loc]['guild_id'])
+                                member = await guild.fetch_member(user.id)
+                                Role = discord.utils.get(member.guild.roles, name="ClockedIn")
+                                await reaction.remove(user)
+                                await member.remove_roles(Role)
 
                     elif reaction.message.channel.id == locations[l]['dispatch-channel']:
                         channel = reaction.message.channel.id
@@ -187,23 +203,28 @@ async def on_reaction_add(reaction, user):
                             usr = DataFrame(clock_collection.find({'user_id': user.id}))
                             order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
                             dm = await bot.fetch_user(user.id)
-                            
-                            if user.bot == False:
-                                if order['dasherAssigned'].bool() == False:
-                                    if usr['clockedIn'].bool() == True:
-                                        order_collection.update_one({'_id': ObjectId(mid)}, {'$set':{'dasherAssigned': True, 'acceptTime': datetime.datetime.now(datetime.timezone.utc), 'dasherID': user.id}})
-                                        order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
-                                        
-                                        smessage = await dm.send(mid + " Order has been accepted!\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'] + "\nReact with :white_check_mark: to mark as complete!")
-                                        await smessage.add_reaction(u"\u2705")
 
-                                        channel = bot.get_channel(location['control-channel'])
-                                        await channel.send("Order has been accepted by " + user.name + " at " + str(datetime.datetime.now(datetime.timezone.utc)) + "\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'])
-                                        await reaction.message.delete()
+                            if usr.empty:
+                                dm = await bot.fetch_user(user.id)
+                                await dm.send("You don't exist in our database! Please clock-in and sign-up before continuing!")
+
+                            else:
+                                if user.bot == False:
+                                    if order['dasherAssigned'].bool() == False:
+                                        if usr['clockedIn'].bool() == True:
+                                            order_collection.update_one({'_id': ObjectId(mid)}, {'$set':{'dasherAssigned': True, 'acceptTime': datetime.datetime.now(datetime.timezone.utc), 'dasherID': user.id}})
+                                            order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
+                                            
+                                            smessage = await dm.send(mid + " Order has been accepted!\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'] + "\nReact with :white_check_mark: to mark as complete!")
+                                            await smessage.add_reaction(u"\u2705")
+
+                                            channel = bot.get_channel(location['control-channel'])
+                                            await channel.send("Order has been accepted by " + user.name + " at " + str(datetime.datetime.now(datetime.timezone.utc)) + "\nPick Up From: " + order.loc[0]['diningAddress'] + "\nDeliver To: " + order.loc[0]['deliveryAddress'] + "\nCustomer Name: " + order.loc[0]['customerName'] + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + order.loc[0]['customerInstructions'])
+                                            await reaction.message.delete()
+                                        else:
+                                            await dm.send("You are not clocked in - please clock in before accepting orders.")
                                     else:
-                                        await dm.send("You are not clocked in - please clock in before accepting orders.")
-                                else:
-                                    await dm.send("Order has Already Been Accepted!")
+                                        await dm.send("Order has Already Been Accepted!")
 
     else:
         if reaction.emoji == '✅':
