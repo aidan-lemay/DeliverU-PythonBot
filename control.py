@@ -12,8 +12,8 @@ intents.reactions = True
 intents.members = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-locations = storage.locations
-# locations = storage.testing
+# locations = storage.locations
+locations = storage.testing
 
 controlBotID = storage.controlBotID
 dispatchBotID = storage.dispatchBotID
@@ -215,11 +215,11 @@ async def on_reaction_add(reaction, user):
                                             order_collection.update_one({'_id': ObjectId(mid)}, {'$set':{'dasherAssigned': True, 'acceptTime': datetime.datetime.now(datetime.timezone.utc), 'dasherID': user.id}})
                                             order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
                                             
-                                            smessage = await dm.send(mid + " Order has been accepted!\nPick Up From: " + str(order.loc[0]['diningAddress']) + "\nDeliver To: " + str(order.loc[0]['deliveryAddress']) + "\nCustomer Name: " + str(order.loc[0]['customerName']) + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + str(order.loc[0]['customerInstructions']) + "\nReact with :white_check_mark: to mark as complete!")
+                                            smessage = await dm.send(mid + " Order has been accepted!\nPick Up From: " + str(order.loc[0]['diningAddress']) + "\nDeliver To: " + str(order.loc[0]['deliveryAddress']) + "\nRoom Number: " + str(order.loc[0]['roomNumber']) + "\nCustomer Name: " + str(order.loc[0]['customerName']) + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + str(order.loc[0]['customerInstructions']) + "\nReact with :white_check_mark: to mark as complete!")
                                             await smessage.add_reaction(u"\u2705")
 
                                             channel = bot.get_channel(location['control-channel'])
-                                            await channel.send("Order has been accepted by " + str(user.name) + " at " + str(datetime.datetime.now(datetime.timezone.utc)) + "\nPick Up From: " + str(order.loc[0]['diningAddress']) + "\nDeliver To: " + str(order.loc[0]['deliveryAddress']) + "\nCustomer Name: " + str(order.loc[0]['customerName']) + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + str(order.loc[0]['customerInstructions']))
+                                            await channel.send("Order has been accepted by " + str(user.name) + " at " + str(datetime.datetime.now(datetime.timezone.utc)) + "\nPick Up From: " + str(order.loc[0]['diningAddress']) + "\nDeliver To: " + str(order.loc[0]['deliveryAddress']) + "\nRoom Number: " + str(order.loc[0]['roomNumber']) + "\nCustomer Name: " + str(order.loc[0]['customerName']) + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + str(order.loc[0]['customerInstructions']))
                                             await reaction.message.delete()
                                         else:
                                             await dm.send("You are not clocked in - please clock in before accepting orders.")
