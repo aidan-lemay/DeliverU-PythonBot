@@ -12,8 +12,8 @@ intents.reactions = True
 intents.members = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-# locations = storage.locations
-locations = storage.testing
+locations = storage.locations
+# locations = storage.testing
 
 controlBotID = storage.controlBotID
 dispatchBotID = storage.dispatchBotID
