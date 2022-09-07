@@ -5,7 +5,6 @@ from pymongo import MongoClient
 from pandas import DataFrame
 import datetime
 from bson.objectid import ObjectId
-import os
 from twilio.rest import Client
 
 # Bot Setup
