@@ -5,6 +5,8 @@ from pymongo import MongoClient
 from pandas import DataFrame
 import datetime
 from bson.objectid import ObjectId
+import os
+from twilio.rest import Client
 
 # Bot Setup
 intents = discord.Intents.default()
@@ -12,11 +14,13 @@ intents.reactions = True
 intents.members = True
 bot = commands.Bot(command_prefix="/", intents=intents)
 
-# locations = storage.locations
-locations = storage.testing
+# Twillio Setup
+account_sid = storage.twSID
+auth_token = storage.twAUTH
+twillio = Client(account_sid, auth_token)
 
-controlBotID = storage.controlBotID
-dispatchBotID = storage.dispatchBotID
+locations = storage.locations
+# locations = storage.testing
 
 # MongoDB Setup
 CONNECTION_STRING = storage.connection
@@ -139,7 +143,6 @@ async def clockOut(user):
             dm = await bot.fetch_user(user.id)
             await dm.send("You Have Not Clocked In Today")
 
-
 @bot.event
 async def on_ready():
     print('Logged in as {0.user}'.format(bot))
@@ -214,9 +217,16 @@ async def on_reaction_add(reaction, user):
                                         if usr['clockedIn'].bool() == True:
                                             order_collection.update_one({'_id': ObjectId(mid)}, {'$set':{'dasherAssigned': True, 'acceptTime': datetime.datetime.now(datetime.timezone.utc), 'dasherID': user.id}})
                                             order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
+                                            dasher = DataFrame(user_collection.find({'user_id': user.id}))
                                             
                                             smessage = await dm.send(mid + " Order has been accepted!\nPick Up From: " + str(order.loc[0]['diningAddress']) + "\nDeliver To: " + str(order.loc[0]['deliveryAddress']) + "\nRoom Number: " + str(order.loc[0]['roomNumber']) + "\nCustomer Name: " + str(order.loc[0]['customerName']) + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + str(order.loc[0]['customerInstructions']) + "\nReact with :white_check_mark: to mark as complete!")
                                             await smessage.add_reaction(u"\u2705")
+
+                                            # Twillio Order Info Dispatch
+                                            toNum = "+1" + str(order.loc[0]['customerPhone'])
+                                            fromNum = location['twPhone']
+                                            name = order.loc[0]['customerName']
+                                            twillio.messages.create(body='Hello ' + name + '!\nYour order has been picked up by ' + dasher.loc[0]['user_firstname'] + '\nYou will recieve a follow-up message when your order is delivered.\nThank you for choosing DeliverU!', from_=fromNum, to=toNum)
 
                                             channel = bot.get_channel(location['control-channel'])
                                             await channel.send("Order has been accepted by " + str(user.name) + " at " + str(datetime.datetime.now(datetime.timezone.utc)) + "\nPick Up From: " + str(order.loc[0]['diningAddress']) + "\nDeliver To: " + str(order.loc[0]['deliveryAddress']) + "\nRoom Number: " + str(order.loc[0]['roomNumber']) + "\nCustomer Name: " + str(order.loc[0]['customerName']) + "\nCustomer Phone Number: " + str(order.loc[0]['customerPhone']) + "\nCustomer Order Instructions: " + str(order.loc[0]['customerInstructions']))
@@ -241,6 +251,14 @@ async def on_reaction_add(reaction, user):
                     channel = bot.get_channel(control)
                     await channel.send("Order " + str(mid) + " has been completed by " + str(user.name) + " at " + str(datetime.datetime.now(datetime.timezone.utc)))
                     await reaction.message.edit(content="Your Order Has Been Completed! Nice Job!")
+                    
+                    # Twillio Order Info Dispatch
+                    order = DataFrame(order_collection.find({'_id': ObjectId(mid)}))
+                    dasher = DataFrame(user_collection.find({'user_id': user.id}))                    
+                    toNum = "+1" + str(order.loc[0]['customerPhone'])
+                    fromNum = locations[int(loccode)]['twPhone']
+                    name = order.loc[0]['customerName']
+                    twillio.messages.create(body='Hello ' + name + '!\n' + dasher.loc[0]['user_firstname'] + ' has completed your order!\nThank you for choosing DeliverU!', from_=fromNum, to=toNum)
 
 @bot.event
 async def on_message(message):
@@ -253,14 +271,23 @@ async def on_message(message):
             found = True
             dispatch = locations[l]['dispatch-channel']
             clocked_role = locations[l]['clocked_role']
+            fromNum = locations[l]['twPhone']
 
     if (found == True):
         msg = message.content.split( )
         order = DataFrame(order_collection.find({'_id': ObjectId(msg[0])}))
+        
         channel = bot.get_channel(dispatch)
-        dinAddr = order.loc[0]['diningAddress']
-        delAddr = order.loc[0]['deliveryAddress']
+        order = order.loc[0]
+        dinAddr = order['diningAddress']
+        delAddr = order['deliveryAddress']
+
         smessage = await channel.send(str(msg[0]) + "\n<@&" + str(clocked_role) + "> A New Order Has Been Submitted!\nFROM: " + dinAddr + "\nTO: " + delAddr + "\nReact with :white_check_mark: to claim!")
         await smessage.add_reaction(u"\u2705")
+
+        # Twillio Order Info Dispatch
+        toNum = "+1" + str(order['customerPhone'])
+        name = order['customerName']
+        twillio.messages.create(body='Hello ' + name + '!\nYour order has been recieved by our system and dispatched to our runners!\nYou will recieve a follow-up message when your order is accepted by a runner.\nThank you for choosing DeliverU!', from_=fromNum, to=toNum)
 
 bot.run(storage.ctoken)
