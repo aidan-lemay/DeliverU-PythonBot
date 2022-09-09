@@ -32,6 +32,7 @@ order_collection = dbname['orders']
 async def clockIn(user):
     usrTest = DataFrame(user_collection.find({'user_id': user.id}))
     loccode = 0
+    uniCode = "Type your University Location Code\n```2760: Rochester Institute of Technology\n5816: University of North Carolina\n2925: SUNY Buffalo\n2928: University of Rochester```"
     if usrTest.empty:
         dm = await bot.fetch_user(user.id)
         await dm.send("Your Information Has Not Yet Been Logged!\nPlease Fill Out The Following Information To Begin Your Shift.")
@@ -48,15 +49,15 @@ async def clockIn(user):
         msg = await bot.wait_for("message", check=check)
         lastName = msg.content.upper()
 
-        await dm.send("Type your University Location Code\n```2760: Rochester Institute of Technology\n5816: University of North Carolina```")
+        await dm.send(uniCode)
         def check(msg):
             return msg.author == user and msg.channel.type == discord.ChannelType.private
         msg = await bot.wait_for("message")
         loccode = msg.content
         code = False
         while code == False:
-            if loccode != "2760" and loccode != "5816":
-                await dm.send("Type your University Location Code\n```2760: Rochester Institute of Technology\n5816: University of North Carolina```")
+            if loccode != "2760" and loccode != "5816" and loccode != "2925" and loccode != "2928":
+                await dm.send(uniCode)
                 def check(msg):
                     return msg.author == user and msg.channel.type == discord.ChannelType.private
                 msg = await bot.wait_for("message")
